@@ -1,29 +1,37 @@
-nav{
-    background-color: rgb(36, 54, 32);
-    color: rgb(0, 214, 89);
-    padding: 30px 60px;
-    display: flex;
-    justify-content: space-between;
+/* Estilos personalizados */
+body {
+    font-family: Arial, sans-serif;
 }
 
-nav ul{
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
+.sidebar {
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    padding-top: 20px;
 }
 
-nav li {
-    list-style: none;
+.main-content {
+    padding: 20px;
 }
 
-nav li a{
-    color: rgb(0, 214, 89);
+.card {
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-link {
+    color: rgb(9, 22, 16);
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-link-principal{
+    color: rgb(8, 245, 134);
     text-decoration: none;
-    font-weight: bold;
-    padding: 5px 8px;
+    margin: 3px;
+    
 }
 
-nav li a:hover {
-    color: rgb(255, 162, 0);
-    text-decoration: none;
+.nav-link-principal:hover{
+    color: darkgreen;
 }
