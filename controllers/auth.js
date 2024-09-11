@@ -95,10 +95,10 @@ exports.login = async (req, res) => {
 
 exports.uploadMusic = (req, res) => {
     const { album_name, album_description, file_name } = req.body;
-    const userId = req.user.id;  // Suponiendo que el ID del usuario está almacenado en req.user tras la autenticación
+    const userId = req.user.id;
 
     if (!album_name || !album_description || !file_name) {
-        return res.status(400).render('upload', {
+        return res.status(400).render('upload-music', {
             message: 'Todos los campos son obligatorios'
         });
     }
@@ -109,40 +109,37 @@ exports.uploadMusic = (req, res) => {
         [album_name, album_description, file_name], (error, results) => {
             if (error) {
                 console.log("Error al insertar en tabla music: ", error);
-                return res.status(500).render('upload', {
+                return res.status(500).render('upload-music', {
                     message: 'Error al cargar la música'
                 });
             }
 
-            // Obtenemos el ID de la música recién insertada
             const musicId = results.insertId;
 
             // Insertamos en la tabla intermedia user_music para relacionar al usuario con la música
             DataBase.query('INSERT INTO user_music (user_id, music_id) VALUES (?, ?)', [userId, musicId], (error, results) => {
                 if (error) {
                     console.log("Error al insertar en tabla user_music: ", error);
-                    return res.status(500).render('upload', {
+                    return res.status(500).render('upload-music', {
                         message: 'Error al asociar la música con el usuario'
                     });
                 }
 
-                // Todo ha salido bien
-                res.status(200).render('upload', {
-                    message: 'Música cargada y asociada exitosamente'
-                });
+                // Redirige a la página de canciones subidas
+                res.redirect('/upload');
             });
         });
 
     } catch (error) {
         console.log("Error en la carga de música: ", error);
-        res.status(500).render('upload', {
+        res.status(500).render('upload-music', {
             message: 'Error en la carga de música'
         });
     }
 };
 
 exports.viewUploadedMusic = (req, res) => {
-    const userId = req.user.id;  // Asegúrate de que el middleware de autenticación esté configurado correctamente
+    const userId = req.user.id;
 
     // Consulta para obtener las canciones subidas por el usuario
     DataBase.query('SELECT album_name, album_description, file_path FROM music INNER JOIN user_music ON music.id = user_music.music_id WHERE user_music.user_id = ?', [userId], (error, results) => {
