@@ -140,3 +140,18 @@ exports.uploadMusic = (req, res) => {
         });
     }
 };
+
+exports.viewUploadedMusic = (req, res) => {
+    const userId = req.user.id;  // Asegúrate de que el middleware de autenticación esté configurado correctamente
+
+    // Consulta para obtener las canciones subidas por el usuario
+    DataBase.query('SELECT album_name, album_description, file_path FROM music INNER JOIN user_music ON music.id = user_music.music_id WHERE user_music.user_id = ?', [userId], (error, results) => {
+        if (error) {
+            console.log("Error al obtener la música del usuario: ", error);
+            return res.status(500).render('upload', { message: 'Error al obtener la música' });
+        }
+
+        // Renderiza la vista con las canciones del usuario
+        res.render('upload', { musicList: results });
+    });
+};

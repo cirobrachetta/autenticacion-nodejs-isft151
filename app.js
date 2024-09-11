@@ -2,10 +2,13 @@ const express = require("express");
 const mysql = require("mysql");
 const dotenv = require('dotenv');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 
 dotenv.config({ path: './.env' });
 
 const app = express();
+
+app.use(cookieParser());
 
 //conecta con la base de datos
 const DataBase = mysql.createConnection({
@@ -16,13 +19,10 @@ const DataBase = mysql.createConnection({
 })
 //__dirname es una variable de nodejs que te da acseso a el directorio en el que estas.
 const PublicDirectory = path.join(__dirname, './public');
-app.use(express.static(PublicDirectory)); //indica a la aplicacion que utilice el directorio con el css y este mismo.
+app.use(express.static(PublicDirectory));
 
-//Parse URL-encoded bodies (as sent by HTML forms) que significa eso? jsjsjs
 app.use(express.urlencoded({ extended: false }));
-//Parse JSON bodies (as sent by API clients)
 app.use(express.json());
-
 //establece el framework que vamos a usar para el HTML
 app.set('view engine', 'hbs');
 /*Es un sistema de plantillas Javascript basado en Mustache Templates. 

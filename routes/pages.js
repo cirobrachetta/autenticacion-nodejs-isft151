@@ -20,6 +20,10 @@ router.get('/DashBoard', (req, res) => {
 
 router.get('/upload-music', (req, res) => {
     res.render('upload-music');
-  });
+});
+
+router.get('/upload', (req, res) => {
+    res.render('upload');
+});
 
 module.exports = router;
