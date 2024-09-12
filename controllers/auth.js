@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 
 const bcrypt = require('bcryptjs');
 
+const path = require('path');
+
 const DataBase = mysql.createConnection({
     host: process.env.DATABASE_HOST,
     user: process.env.DATABASE_USER,
@@ -94,61 +96,72 @@ exports.login = async (req, res) => {
 };
 
 exports.uploadMusic = (req, res) => {
-    const { album_name, album_description, file_name } = req.body;
-    const userId = req.user.id;
+    const { album_name, album_description } = req.body; // Obtenemos los campos del formulario
+    const userId = req.user.id;  // ID del usuario desde el token autenticado
+    const file_name = req.file ? req.file.filename : null; // Obtenemos el nombre del archivo subido con multer
 
     if (!album_name || !album_description || !file_name) {
-        return res.status(400).render('upload-music', {
+        // Verificar que todos los campos estén presentes
+        return res.status(400).render('music-upload', {
             message: 'Todos los campos son obligatorios'
         });
     }
 
     try {
-        // Insertamos el álbum en la tabla music
+        // Insertar en la tabla 'music' los detalles del álbum
         DataBase.query('INSERT INTO music (album_name, album_description, file_path) VALUES (?, ?, ?)', 
-        [album_name, album_description, file_name], (error, results) => {
+        [album_name, album_description, path.join('uploads', file_name)], (error, results) => {
             if (error) {
-                console.log("Error al insertar en tabla music: ", error);
-                return res.status(500).render('upload-music', {
+                console.log("Error al insertar en la tabla 'music': ", error);
+                return res.status(500).render('music-upload', {
                     message: 'Error al cargar la música'
                 });
             }
 
-            const musicId = results.insertId;
+            const musicId = results.insertId;  // Obtenemos el ID del álbum recién insertado
 
-            // Insertamos en la tabla intermedia user_music para relacionar al usuario con la música
+            // Insertar en la tabla intermedia 'user_music' para asociar al usuario con la música
             DataBase.query('INSERT INTO user_music (user_id, music_id) VALUES (?, ?)', [userId, musicId], (error, results) => {
                 if (error) {
-                    console.log("Error al insertar en tabla user_music: ", error);
-                    return res.status(500).render('upload-music', {
+                    console.log("Error al insertar en la tabla 'user_music': ", error);
+                    return res.status(500).render('music-upload', {
                         message: 'Error al asociar la música con el usuario'
                     });
                 }
 
-                // Redirige a la página de canciones subidas
+                // Redirigir a la página de visualización de canciones subidas después de una subida exitosa
                 res.redirect('/upload');
             });
         });
 
     } catch (error) {
         console.log("Error en la carga de música: ", error);
-        res.status(500).render('upload-music', {
+        res.status(500).render('music-upload', {
             message: 'Error en la carga de música'
         });
     }
 };
 
 exports.viewUploadedMusic = (req, res) => {
-    const userId = req.user.id;
+    const userId = req.user.id;  // Asegúrate de que el ID del usuario esté disponible
 
-    // Consulta para obtener las canciones subidas por el usuario
-    DataBase.query('SELECT album_name, album_description, file_path FROM music INNER JOIN user_music ON music.id = user_music.music_id WHERE user_music.user_id = ?', [userId], (error, results) => {
-        if (error) {
-            console.log("Error al obtener la música del usuario: ", error);
-            return res.status(500).render('upload', { message: 'Error al obtener la música' });
+    // Consulta SQL para obtener las canciones subidas por el usuario
+    DataBase.query(
+        'SELECT music.album_name, music.album_description, music.file_path FROM music INNER JOIN user_music ON music.id = user_music.music_id WHERE user_music.user_id = ?', 
+        [userId], 
+        (error, results) => {
+            if (error) {
+                console.log("Error al obtener la música del usuario: ", error);
+                return res.status(500).render('upload', { message: 'Error al obtener la música' });
+            }
+
+            // Verificar si se encontraron resultados y renderizar la vista con los resultados
+            if (results.length > 0) {
+                res.render('upload', { musicList: results });
+            } else {
+                // Renderizar la vista sin resultados
+                res.render('upload', { musicList: [] });
+            }
         }
-
-        // Renderiza la vista con las canciones del usuario
-        res.render('upload', { musicList: results });
-    });
+    );
 };
