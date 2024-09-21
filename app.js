@@ -21,6 +21,11 @@ const DataBase = mysql.createConnection({
 const PublicDirectory = path.join(__dirname, './public');
 app.use(express.static(PublicDirectory));
 
+app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    next();
+});
+
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 //establece el framework que vamos a usar para el HTML

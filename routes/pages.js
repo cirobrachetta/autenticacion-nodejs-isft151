@@ -2,6 +2,8 @@ const express = require('express');
 
 const router = express.Router();
 
+const authenticateToken = require('../middleware/authMiddleware');
+
 router.get('/', (req, res) => {
     res.render('index');
 });
@@ -14,8 +16,10 @@ router.get('/login', (req, res) => {
     res.render('login');
 });
 
-router.get('/DashBoard', (req, res) => {
-    res.render('DashBoard');
+router.get('/DashBoard', authenticateToken, (req, res) => {
+    res.render('DashBoard', {
+        user: req.user  // Puedes pasar los datos del usuario si los necesitas en la vista
+    });
 });
 
 router.get('/upload-music', (req, res) => {
