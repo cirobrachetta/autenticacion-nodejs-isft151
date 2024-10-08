@@ -15,7 +15,8 @@ const DataBase = mysql.createConnection({
     host: process.env.DATABASE_HOST,
     user: process.env.DATABASE_USER,
     pasword: process.env.DATABASE_PASSWORD,
-    database: process.env.DATABASE
+    database: process.env.DATABASE,
+    charset: 'utf8_unicode_ci'  // Asegúrate de que esto esté configurado
 })
 //__dirname es una variable de nodejs que te da acseso a el directorio en el que estas.
 const PublicDirectory = path.join(__dirname, './public');

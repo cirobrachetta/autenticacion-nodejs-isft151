@@ -12,7 +12,8 @@ const DataBase = mysql.createConnection({
     host: process.env.DATABASE_HOST,
     user: process.env.DATABASE_USER,
     pasword: process.env.DATABASE_PASSWORD,
-    database: process.env.DATABASE
+    database: process.env.DATABASE,
+    charset: 'utf8_unicode_ci'  // Asegúrate de que esto esté configurado
 });
 
 exports.register = (req, res) => {
@@ -75,23 +76,25 @@ exports.login = async (req, res) => {
 
     DataBase.query('SELECT * FROM users WHERE email = ?', [email], async (error, results) => {
         if (!results || results.length === 0 || !(await bcrypt.compare(password, results[0].password))) {
-            res.status(401).render('login', {
+            return res.status(401).render('login', {
                 message: 'Email or Password is incorrect'
             });
         } else {
             const id = results[0].id;
             const token = jwt.sign({ id }, process.env.JWT_SECRET, {
-                expiresIn: process.env.JWT_EXPIRES_IN
+                expiresIn: '15m'  // Expira en 15 minutos
             });
 
-            // Configurar la cookie JWT sin expires ni maxAge
             const cookieOptions = {
-                httpOnly: true,  // Solo accesible desde HTTP (no JavaScript)
-                sameSite: true,  // Protección CSRF
-                secure: process.env.NODE_ENV === 'production'  // Solo en HTTPS en producción
+                httpOnly: true,
+                sameSite: true,
+                secure: process.env.NODE_ENV === 'production',
+                maxAge: 15 * 60 * 1000  // Expira en 15 minutos (900000 ms)
             };
 
             res.cookie('jwt', token, cookieOptions);
+
+            // Redirigir al DashBoard y establecer el sessionStorage desde el frontend
             res.status(200).redirect("/DashBoard");
         }
     });
@@ -112,89 +115,152 @@ exports.logout = (req, res) => {
 
 
 // Controlador para subir música
-exports.uploadMusic = (req, res) => {
-    const { album_name, album_description, artist, song_name } = req.body;
-    const userId = req.user.id;
-    const file_name = req.file ? req.file.filename : null;
-
-    if (!album_name || !album_description || !artist || !song_name || !file_name) {
-        return res.status(400).render('music-upload', {
-            message: 'Todos los campos son obligatorios'
-        });
+// Controlador para subir sencillos
+exports.uploadSingle = (req, res) => {
+    const song = req.file;  // Archivo de la canción subido
+    if (!song) {
+        return res.status(400).send('No se ha subido ninguna canción.');
     }
 
-    try {
-        // Verificar si la canción ya existe para este usuario
-        DataBase.query('SELECT * FROM music INNER JOIN user_music ON music.id = user_music.music_id WHERE music.artist = ? AND music.song_name = ? AND user_music.user_id = ?', 
-        [artist, song_name, userId], (error, results) => {
-            if (error) {
-                console.log("Error al verificar si la canción ya existe: ", error);
-                return res.status(500).render('upload-music', {
-                    message: 'Error al verificar la canción en la base de datos'
-                });
+    // Inserta la canción como sencillo en la tabla 'songs'
+    const songData = {
+        song_name: req.body.song_name,
+        file_path: song.path.replace(/\\/g, '/'),
+        artist: req.body.artist || 'Desconocido'
+    };
+
+    DataBase.query('INSERT INTO songs SET ?', songData, (err, songResult) => {
+        if (err) {
+            console.error('Error al guardar el sencillo: ', err);
+            return res.status(500).send('Error al guardar el sencillo.');
+        }
+
+        const songId = songResult.insertId; // ID de la canción recién creada
+
+        // Relaciona la canción con el usuario en 'user_songs'
+        DataBase.query('INSERT INTO user_songs (user_id, song_id) VALUES (?, ?)', [req.user.id, songId], (err) => {
+            if (err) {
+                console.error('Error al relacionar el sencillo con el usuario: ', err);
+                return res.status(500).send('Error al relacionar el sencillo con el usuario.');
             }
 
-            // Si ya existe una canción con el mismo artista y nombre para este usuario, devolver un error
-            if (results.length > 0) {
-                return res.status(400).render('upload-music', {
-                    message: 'Ya has subido esta canción antes'
-                });
-            }
+            res.status(200).redirect('/upload');  // Redirige al ver las canciones subidas
+        });
+    });
+};
 
-            // Si no existe, proceder con la inserción
-            DataBase.query('INSERT INTO music (album_name, album_description, artist, song_name, file_path) VALUES (?, ?, ?, ?, ?)', 
-            [album_name, album_description, artist, song_name, path.join('uploads', file_name)], (error, results) => {
-                if (error) {
-                    console.log("Error al insertar en la tabla 'music': ", error);
-                    return res.status(500).render('upload-music', {
-                        message: 'Error al cargar la música'
-                    });
+// Controlador para subir EPs
+exports.uploadEP = (req, res) => {
+    const songs = req.files;  // Archivos de las canciones subidas
+    if (!songs || songs.length === 0) {
+        return res.status(400).send('No se han subido canciones.');
+    }
+
+    // Inserta el EP en la tabla 'eps'
+    const epData = {
+        album_name: req.body.album_name,
+        album_description: req.body.album_description || ''
+    };
+
+    DataBase.query('INSERT INTO eps SET ?', epData, (err, epResult) => {
+        if (err) {
+            console.error('Error al guardar el EP: ', err);
+            return res.status(500).send('Error al guardar el EP.');
+        }
+
+        const epId = epResult.insertId; // ID del EP recién creado
+
+        // Relaciona el EP con el usuario en 'user_eps'
+        DataBase.query('INSERT INTO user_eps (user_id, ep_id) VALUES (?, ?)', [req.user.id, epId], (err) => {
+            if (err) {
+                console.error('Error al relacionar el EP con el usuario: ', err);
+                return res.status(500).send('Error al relacionar el EP con el usuario.');
+            }
+        });
+
+        songs.forEach(song => {
+            const songData = {
+                song_name: song.originalname,
+                file_path: song.path.replace(/\\/g, '/'),
+                artist: req.body.artist || 'Desconocido'
+            };
+
+            DataBase.query('INSERT INTO songs SET ?', songData, (err, songResult) => {
+                if (err) {
+                    console.error('Error al guardar la canción: ', err);
+                    return res.status(500).send('Error al guardar la canción.');
                 }
 
-                const musicId = results.insertId;
+                const songId = songResult.insertId;
 
-                // Insertar en la tabla intermedia 'user_music' para asociar la música con el usuario
-                DataBase.query('INSERT INTO user_music (user_id, music_id) VALUES (?, ?)', [userId, musicId], (error, results) => {
-                    if (error) {
-                        console.log("Error al insertar en la tabla 'user_music': ", error);
-                        return res.status(500).render('upload-music', {
-                            message: 'Error al asociar la música con el usuario'
-                        });
+                // Relaciona la canción con el EP en 'ep_songs'
+                DataBase.query('INSERT INTO ep_songs (ep_id, song_id) VALUES (?, ?)', [epId, songId], (err) => {
+                    if (err) {
+                        console.error('Error al asociar la canción con el EP: ', err);
+                        return res.status(500).send('Error al asociar la canción con el EP.');
                     }
-
-                    // Redirigir a la página de visualización de canciones subidas
-                    res.redirect('/upload');
                 });
             });
         });
 
-    } catch (error) {
-        console.log("Error en la carga de música: ", error);
-        res.status(500).render('upload-music', {
-            message: 'Error en la carga de música'
-        });
-    }
+        res.status(200).redirect('/upload');  // Redirige al ver las canciones subidas
+    });
 };
-exports.viewUploadedMusic = (req, res) => {
-    const userId = req.user.id;  // Asegúrate de que el ID del usuario esté disponible
 
-    // Consulta SQL para obtener las canciones subidas por el usuario
-    DataBase.query(
-        'SELECT music.album_name, music.album_description, music.file_path FROM music INNER JOIN user_music ON music.id = user_music.music_id WHERE user_music.user_id = ?', 
-        [userId], 
-        (error, results) => {
-            if (error) {
-                console.log("Error al obtener la música del usuario: ", error);
-                return res.status(500).render('upload', { message: 'Error al obtener la música' });
-            }
+// Controlador para subir Álbumes
+exports.uploadAlbum = (req, res) => {
+    const songs = req.files;  // Archivos de las canciones subidas
+    if (!songs || songs.length === 0) {
+        return res.status(400).send('No se han subido canciones.');
+    }
 
-            // Verificar si se encontraron resultados y renderizar la vista con los resultados
-            if (results.length > 0) {
-                res.render('upload', { musicList: results });
-            } else {
-                // Renderizar la vista sin resultados
-                res.render('upload', { musicList: [] });
-            }
+    // Inserta el álbum en la tabla 'albums'
+    const albumData = {
+        album_name: req.body.album_name,
+        album_description: req.body.album_description || ''
+    };
+
+    DataBase.query('INSERT INTO albums SET ?', albumData, (err, albumResult) => {
+        if (err) {
+            console.error('Error al guardar el álbum: ', err);
+            return res.status(500).send('Error al guardar el álbum.');
         }
-    );
+
+        const albumId = albumResult.insertId; // ID del álbum recién creado
+
+        // Relaciona el álbum con el usuario en 'user_albums'
+        DataBase.query('INSERT INTO user_albums (user_id, album_id) VALUES (?, ?)', [req.user.id, albumId], (err) => {
+            if (err) {
+                console.error('Error al relacionar el álbum con el usuario: ', err);
+                return res.status(500).send('Error al relacionar el álbum con el usuario.');
+            }
+        });
+
+        songs.forEach(song => {
+            const songData = {
+                song_name: song.originalname,
+                file_path: song.path.replace(/\\/g, '/'),
+                artist: req.body.artist || 'Desconocido'
+            };
+
+            DataBase.query('INSERT INTO songs SET ?', songData, (err, songResult) => {
+                if (err) {
+                    console.error('Error al guardar la canción: ', err);
+                    return res.status(500).send('Error al guardar la canción.');
+                }
+
+                const songId = songResult.insertId;
+
+                // Relaciona la canción con el álbum en 'album_songs'
+                DataBase.query('INSERT INTO album_songs (album_id, song_id) VALUES (?, ?)', [albumId, songId], (err) => {
+                    if (err) {
+                        console.error('Error al asociar la canción con el álbum: ', err);
+                        return res.status(500).send('Error al asociar la canción con el álbum.');
+                    }
+                });
+            });
+        });
+
+        res.status(200).redirect('/upload');  // Redirige al ver las canciones subidas
+    });
 };

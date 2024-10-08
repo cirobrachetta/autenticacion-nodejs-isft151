@@ -20,8 +20,14 @@ router.get('/DashBoard', authenticateToken, (req, res) => {
     res.render('DashBoard', { user: req.user });
 });
 
-router.post('/upload-music', authenticateToken, upload.single('file_name'), authController.uploadMusic);  // Usa el middleware de multer aquí
 
-router.get('/upload', authenticateToken, authController.viewUploadedMusic);   // GET para ver la música subida
+
+// Rutas POST para manejar la subida de archivos
+router.post('/upload-single', authenticateToken, upload.uploadSingle, authController.uploadSingle);
+
+router.post('/upload-ep', authenticateToken, upload.uploadArrayEP, authController.uploadEP);
+
+router.post('/upload-album', authenticateToken, upload.uploadArrayAlbum, authController.uploadAlbum);
+
 
 module.exports = router;

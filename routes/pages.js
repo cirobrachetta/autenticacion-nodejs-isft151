@@ -26,6 +26,26 @@ router.get('/upload-music', (req, res) => {
     res.render('upload-music');
 });
 
+// Rutas para subir sencillos, EPs y discos
+router.get('/upload-single', authenticateToken, (req, res) => {
+    res.render('upload-single', {
+        user: req.user  // Puedes pasar los datos del usuario si los necesitas en la vista
+    });  // Vista para subir sencillos
+});
+
+router.get('/upload-ep', authenticateToken, (req, res) => {
+    res.render('upload-ep', {
+        user: req.user  // Puedes pasar los datos del usuario si los necesitas en la vista
+    });  // Vista para subir EP
+});
+
+router.get('/upload-album', authenticateToken, (req, res) => {
+    res.render('upload-album', {
+        user: req.user  // Puedes pasar los datos del usuario si los necesitas en la vista
+    });  // Vista para subir álbumes
+});
+
+
 router.get('/upload', (req, res) => {
     res.render('upload');
 });
